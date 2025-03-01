@@ -1,7 +1,43 @@
 // localbin.ts
 
-// In-memory storage for pastes
-const pastes = new Map<string, { content: string; created: Date }>();
+// File-based storage with in-memory cache
+const STORAGE_FILE = "./pastes.json";
+let pastes = new Map<string, { content: string; created: Date }>();
+
+// Load existing pastes from file
+async function loadPastes() {
+  try {
+    const fileContent = await Deno.readTextFile(STORAGE_FILE);
+    const data = JSON.parse(fileContent) as Record<string, { content: string; created: string }>;
+    
+    // Convert plain objects back to Map with proper Date objects
+    pastes = new Map(
+      Object.entries(data).map(([id, paste]: [string, { content: string; created: string }]) => [
+        id,
+        { ...paste, created: new Date(paste.created) }
+      ])
+    );
+    
+    console.log(`Loaded ${pastes.size} pastes from storage`);
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) {
+      console.error("Failed to load pastes:", error);
+    }
+    // File doesn't exist yet, that's fine for first run
+    pastes = new Map();
+  }
+}
+
+// Save pastes to file
+async function savePastes() {
+  try {
+    // Convert Map to a regular object for JSON serialization
+    const data = Object.fromEntries(pastes.entries());
+    await Deno.writeTextFile(STORAGE_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error("Failed to save pastes:", error);
+  }
+}
 
 // Generate a random alphanumeric ID
 function generateId(length = 6): string {
@@ -30,6 +66,9 @@ const htmlForm = `
 </body>
 </html>
 `;
+
+// Initialize by loading existing pastes
+await loadPastes();
 
 // Use Deno.serve API to create a simple HTTP server
 Deno.serve({ port: 8000 }, async (req: Request) => {
@@ -61,6 +100,10 @@ Deno.serve({ port: 8000 }, async (req: Request) => {
 
     const id = generateId();
     pastes.set(id, { content, created: new Date() });
+    
+    // Save pastes after adding a new one
+    await savePastes();
+    
     const responseBody =
       `Paste created! Access it at <a href="/pastes/${id}">/pastes/${id}</a>`;
     return new Response(responseBody, {
