@@ -1,0 +1,2 @@
+<p><em>Created at: <%= it.created %></em></p>
+<pre><%= it.content %></pre>

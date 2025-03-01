@@ -1,0 +1,13 @@
+<div class="paste-list">
+  <% if (it.pastes.length > 0) { %>
+    <% it.pastes.forEach(function(paste) { %>
+      <div class="paste-item">
+        <strong><a href="/pastes/<%= paste.id %>"><%= paste.id %></a></strong>
+        <span> - <%= paste.created %></span>
+        <p><%= paste.preview %></p>
+      </div>
+    <% }) %>
+  <% } else { %>
+    <p>No pastes available yet.</p>
+  <% } %>
+</div>

@@ -1,0 +1,19 @@
+<form method="POST" action="/pastes">
+  <textarea name="content" rows="10" placeholder="Enter your text here"></textarea><br>
+  <button type="submit">Create Paste</button>
+</form>
+
+<div class="paste-list">
+  <h2>Recent Pastes</h2>
+  <% if (it.pastes.length > 0) { %>
+    <% it.pastes.forEach(function(paste) { %>
+      <div class="paste-item">
+        <strong><a href="/pastes/<%= paste.id %>"><%= paste.id %></a></strong> - 
+        <span><%= paste.created %></span>
+        <p><%= paste.preview %></p>
+      </div>
+    <% }) %>
+  <% } else { %>
+    <p>No pastes available yet.</p>
+  <% } %>
+</div>
