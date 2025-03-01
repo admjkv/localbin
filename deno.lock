@@ -1,0 +1,16 @@
+{
+  "version": "4",
+  "specifiers": {
+    "jsr:@eta-dev/eta@^3.5.0": "3.5.0"
+  },
+  "jsr": {
+    "@eta-dev/eta@3.5.0": {
+      "integrity": "6b70827efc14c7cbf08498ac7a922ecab003641caf3852a6cb5b1b12ee58fb37"
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@eta-dev/eta@^3.5.0"
+    ]
+  }
+}
