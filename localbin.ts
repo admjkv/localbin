@@ -1,8 +1,13 @@
 // localbin.ts
 
+import * as eta from "@eta-dev/eta";
+
 // File-based storage with in-memory cache
 const STORAGE_FILE = "./pastes.json";
 let pastes = new Map<string, { content: string; created: Date }>();
+
+// Initialize Eta after your other constants
+const etaEngine = new eta.Eta({ views: "./templates" });
 
 // Load existing pastes from file
 async function loadPastes() {
@@ -119,92 +124,64 @@ function renderHomePage() {
   // Get all pastes sorted by creation date (newest first)
   const pasteList = Array.from(pastes.entries())
     .sort((a, b) => b[1].created.getTime() - a[1].created.getTime())
-    .map(([id, paste]) => {
-      // Get a preview of the content (first 50 chars)
-      const preview = paste.content.length > 50 
+    .map(([id, paste]) => ({
+      id,
+      created: paste.created.toLocaleString(),
+      preview: paste.content.length > 50 
         ? paste.content.substring(0, 50) + '...' 
-        : paste.content;
-      
-      return `
-        <div class="paste-item">
-          <strong><a href="/pastes/${id}">${id}</a></strong> - 
-          <span>${paste.created.toLocaleString()}</span>
-          <p>${preview}</p>
-        </div>
-      `;
-    })
-    .join('');
+        : paste.content
+    }));
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>LocalBin</title>
-      <style>${styles}</style>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
-    <body>
-      <div class="header-actions">
-        <h1>LocalBin</h1>
-        <a href="/list">View All Pastes</a>
-      </div>
-      
-      <form method="POST" action="/pastes">
-        <textarea name="content" rows="10" placeholder="Enter your text here"></textarea><br>
-        <button type="submit">Create Paste</button>
-      </form>
-      
-      <div class="paste-list">
-        <h2>Recent Pastes</h2>
-        ${pastes.size > 0 ? pasteList : '<p>No pastes available yet.</p>'}
-      </div>
-    </body>
-    </html>
-  `;
+  return etaEngine.render("base", {
+    title: "LocalBin",
+    styles,
+    header: "LocalBin",
+    backLink: "/list",
+    backLinkText: "View All Pastes",
+    body: etaEngine.render("home", {
+      pastes: pasteList
+    })
+  });
 }
 
 // HTML template for the paste list page
 function renderPasteListPage() {
   const pasteList = Array.from(pastes.entries())
     .sort((a, b) => b[1].created.getTime() - a[1].created.getTime())
-    .map(([id, paste]) => {
-      // Get a preview of the content
-      const preview = paste.content.length > 100 
+    .map(([id, paste]) => ({
+      id,
+      created: paste.created.toLocaleString(),
+      preview: paste.content.length > 100 
         ? paste.content.substring(0, 100) + '...' 
-        : paste.content;
-      
-      return `
-        <div class="paste-item">
-          <strong><a href="/pastes/${id}">${id}</a></strong>
-          <span> - ${paste.created.toLocaleString()}</span>
-          <p>${preview}</p>
-        </div>
-      `;
-    })
-    .join('');
+        : paste.content
+    }));
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>All Pastes - LocalBin</title>
-      <style>${styles}</style>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-    </head>
-    <body>
-      <div class="header-actions">
-        <h1>All Pastes</h1>
-        <a href="/">Back to Home</a>
-      </div>
-      
-      <div class="paste-list">
-        ${pastes.size > 0 ? pasteList : '<p>No pastes available yet.</p>'}
-      </div>
-    </body>
-    </html>
-  `;
+  return etaEngine.render("base", {
+    title: "All Pastes",
+    styles,
+    header: "All Pastes",
+    backLink: "/",
+    backLinkText: "Back to Home",
+    body: etaEngine.render("list", {
+      pastes: pasteList
+    })
+  });
+}
+
+// Update your paste route handler to use the template
+// Replace the pasteHtml with:
+function renderPastePage(id: string, content: string, created: Date) {
+  return etaEngine.render("base", {
+    title: `Paste ${id}`,
+    styles,
+    header: `Paste ID: ${id}`,
+    backLink: "/",
+    backLinkText: "Back to Home",
+    body: etaEngine.render("paste", {
+      content,
+      created: created.toLocaleString()
+    })
+  });
 }
 
 // Initialize by loading existing pastes
@@ -266,26 +243,7 @@ Deno.serve({ port: 8000 }, async (req: Request) => {
       return new Response("Paste not found", { status: 404 });
     }
     const { content, created } = pastes.get(id)!;
-    const pasteHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Paste ${id} - LocalBin</title>
-        <style>${styles}</style>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-      </head>
-      <body>
-        <div class="header-actions">
-          <h1>Paste ID: ${id}</h1>
-          <a href="/">Back to Home</a>
-        </div>
-        <p><em>Created at: ${created.toLocaleString()}</em></p>
-        <pre>${content}</pre>
-      </body>
-      </html>
-    `;
-    return new Response(pasteHtml, {
+    return new Response(renderPastePage(id, content, created), {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
