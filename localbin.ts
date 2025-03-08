@@ -33,12 +33,28 @@ async function loadPastes() {
   }
 }
 
-// Save pastes to file
+let saveTimeout: number | null = null;
+function debouncedSavePastes() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  
+  saveTimeout = setTimeout(async () => {
+    await savePastes();
+    saveTimeout = null;
+  }, 2000) as unknown as number;
+}
+
 async function savePastes() {
   try {
-    // Convert Map to a regular object for JSON serialization
     const data = Object.fromEntries(pastes.entries());
-    await Deno.writeTextFile(STORAGE_FILE, JSON.stringify(data, null, 2));
+    const tempFile = `${STORAGE_FILE}.temp`;
+    
+    // Write to temp file first
+    await Deno.writeTextFile(tempFile, JSON.stringify(data, null, 2));
+    
+    // Then rename to actual file (atomic operation)
+    await Deno.rename(tempFile, STORAGE_FILE);
   } catch (error) {
     console.error("Failed to save pastes:", error);
   }
@@ -227,7 +243,7 @@ Deno.serve({ port: 8000 }, async (req: Request) => {
     pastes.set(id, { content, created: new Date() });
     
     // Save pastes after adding a new one
-    await savePastes();
+    await debouncedSavePastes();
     
     // Redirect to the new paste page
     return new Response(null, {
