@@ -70,71 +70,6 @@ function generateId(length = 6): string {
   return id;
 }
 
-// CSS styles for the entire application
-const styles = `
-  body {
-    font-family: 'Noto Sans', 'Liberation Sans', Tahoma, Geneva, Verdana, sans-serif;
-    line-height: 1.6;
-    color: #333;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #f5f5f5;
-  }
-  h1, h2 {
-    color: #2c3e50;
-  }
-  textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: monospace;
-    margin-bottom: 10px;
-  }
-  button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-  }
-  button:hover {
-    background-color: #2980b9;
-  }
-  pre {
-    background-color: #f9f9f9;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    overflow-x: auto;
-  }
-  a {
-    color: #3498db;
-    text-decoration: none;
-  }
-  a:hover {
-    text-decoration: underline;
-  }
-  .paste-list {
-    margin-top: 30px;
-  }
-  .paste-item {
-    background-color: white;
-    padding: 10px 15px;
-    margin-bottom: 10px;
-    border-radius: 4px;
-    border-left: 4px solid #3498db;
-  }
-  .header-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-`;
-
 // HTML template for the homepage with form and list of pastes
 function renderHomePage() {
   // Get all pastes sorted by creation date (newest first)
@@ -150,7 +85,6 @@ function renderHomePage() {
 
   return etaEngine.render("base", {
     title: "LocalBin",
-    styles,
     header: "LocalBin",
     backLink: "/list",
     backLinkText: "View All Pastes",
@@ -174,7 +108,6 @@ function renderPasteListPage() {
 
   return etaEngine.render("base", {
     title: "All Pastes",
-    styles,
     header: "All Pastes",
     backLink: "/",
     backLinkText: "Back to Home",
@@ -188,7 +121,6 @@ function renderPasteListPage() {
 function renderPastePage(id: string, content: string, created: Date) {
   return etaEngine.render("base", {
     title: `Paste ${id}`,
-    styles,
     header: `Paste ID: ${id}`,
     backLink: "/",
     backLinkText: "Back to Home",
