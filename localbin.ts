@@ -185,7 +185,6 @@ function renderPasteListPage() {
 }
 
 // Update your paste route handler to use the template
-// Replace the pasteHtml with:
 function renderPastePage(id: string, content: string, created: Date) {
   return etaEngine.render("base", {
     title: `Paste ${id}`,
@@ -200,12 +199,50 @@ function renderPastePage(id: string, content: string, created: Date) {
   });
 }
 
+// Helper function to serve static files
+async function serveStaticFile(path: string, contentType: string): Promise<Response> {
+  try {
+    const file = await Deno.readFile(path);
+    return new Response(file, {
+      status: 200,
+      headers: { "content-type": contentType },
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response("File not found", { status: 404 });
+    }
+    return new Response("Internal server error", { status: 500 });
+  }
+}
+
 // Initialize by loading existing pastes
 await loadPastes();
 
 // Use Deno.serve API to create a simple HTTP server
 Deno.serve({ port: 8000 }, async (req: Request) => {
   const url = new URL(req.url);
+
+  // Static file handler
+  if (url.pathname.startsWith("/static/")) {
+    const filePath = "." + url.pathname;
+    const fileExt = filePath.split(".").pop()?.toLowerCase();
+    
+    // Map extensions to content types
+    const contentTypes: Record<string, string> = {
+      "css": "text/css",
+      "js": "text/javascript",
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "svg": "image/svg+xml"
+    };
+    
+    const contentType = fileExt && contentTypes[fileExt] 
+      ? contentTypes[fileExt] 
+      : "application/octet-stream";
+      
+    return serveStaticFile(filePath, contentType);
+  }
 
   // Route: GET / (Homepage with form and recent pastes)
   if (req.method === "GET" && url.pathname === "/") {
