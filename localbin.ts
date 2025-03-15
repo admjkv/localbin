@@ -33,6 +33,27 @@ async function loadPastes() {
   }
 }
 
+// Cleanup expired pastes
+function cleanupExpiredPastes() {
+  const now = new Date();
+  let expired = 0;
+  
+  for (const [id, paste] of pastes.entries()) {
+    if (paste.expiresAt && paste.expiresAt <= now) {
+      pastes.delete(id);
+      expired++;
+    }
+  }
+  
+  if (expired > 0) {
+    console.log(`Cleaned up ${expired} expired pastes`);
+    debouncedSavePastes();
+  }
+  
+  // Schedule next cleanup
+  setTimeout(cleanupExpiredPastes, 60 * 60 * 1000); // Run every hour
+}
+
 let saveTimeout: number | null = null;
 function debouncedSavePastes() {
   if (saveTimeout) {
@@ -149,6 +170,9 @@ async function serveStaticFile(path: string, contentType: string): Promise<Respo
 
 // Initialize by loading existing pastes
 await loadPastes();
+
+// Start cleanup process after loading pastes
+cleanupExpiredPastes();
 
 // Use Deno.serve API to create a simple HTTP server
 Deno.serve({ port: 8000 }, async (req: Request) => {
