@@ -168,111 +168,121 @@ async function serveStaticFile(path: string, contentType: string): Promise<Respo
   }
 }
 
+// Error handling middleware
+async function handleRequest(req: Request): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+
+    // Static file handler
+    if (url.pathname.startsWith("/static/")) {
+      const filePath = "." + url.pathname;
+      const fileExt = filePath.split(".").pop()?.toLowerCase();
+      
+      // Map extensions to content types
+      const contentTypes: Record<string, string> = {
+        "css": "text/css",
+        "js": "text/javascript",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "svg": "image/svg+xml"
+      };
+      
+      const contentType = fileExt && contentTypes[fileExt] 
+        ? contentTypes[fileExt] 
+        : "application/octet-stream";
+        
+      return serveStaticFile(filePath, contentType);
+    }
+
+    // Route: GET / (Homepage with form and recent pastes)
+    if (req.method === "GET" && url.pathname === "/") {
+      return new Response(renderHomePage(), {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Route: GET /list (List all pastes)
+    if (req.method === "GET" && url.pathname === "/list") {
+      return new Response(renderPasteListPage(), {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Route: POST /pastes (handle JSON or form submissions)
+    if (req.method === "POST" && url.pathname === "/pastes") {
+      let content = "";
+      let expirationHours: number | null = null;
+      
+      const contentType = req.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await req.json();
+        content = body.content;
+        expirationHours = body.expirationHours ? parseInt(body.expirationHours) : null;
+      } else if (contentType.includes("application/x-www-form-urlencoded")) {
+        const formData = await req.formData();
+        content = formData.get("content")?.toString() || "";
+        const expiration = formData.get("expiration")?.toString();
+        expirationHours = expiration ? parseInt(expiration) : null;
+      }
+
+      if (!content) {
+        return new Response("Content is required", { status: 400 });
+      }
+
+      const id = generateId();
+      const created = new Date();
+      const pasteData: { content: string; created: Date; expiresAt?: Date } = { content, created };
+      
+      // Add expiration if specified
+      if (expirationHours && !isNaN(expirationHours)) {
+        const expiresAt = new Date(created);
+        expiresAt.setHours(expiresAt.getHours() + expirationHours);
+        pasteData.expiresAt = expiresAt;
+      }
+      
+      pastes.set(id, pasteData);
+      
+      // Save pastes after adding a new one
+      await debouncedSavePastes();
+      
+      // Redirect to the new paste page
+      return new Response(null, {
+        status: 302,
+        headers: { "Location": `/pastes/${id}` },
+      });
+    }
+
+    // Route: GET /pastes/:id to retrieve a paste
+    if (req.method === "GET" && url.pathname.startsWith("/pastes/")) {
+      const id = url.pathname.split("/")[2];
+      if (!pastes.has(id)) {
+        return new Response("Paste not found", { status: 404 });
+      }
+      const { content, created } = pastes.get(id)!;
+      return new Response(renderPastePage(id, content, created), {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Fallback: Route not found
+    return new Response("Not Found", { status: 404 });
+  } catch (error) {
+    console.error("Request handler error:", error);
+    return new Response("Internal Server Error", { 
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
 // Initialize by loading existing pastes
 await loadPastes();
-
-// Start cleanup process after loading pastes
+// Start the cleanup process
 cleanupExpiredPastes();
 
-// Use Deno.serve API to create a simple HTTP server
-Deno.serve({ port: 8000 }, async (req: Request) => {
-  const url = new URL(req.url);
-
-  // Static file handler
-  if (url.pathname.startsWith("/static/")) {
-    const filePath = "." + url.pathname;
-    const fileExt = filePath.split(".").pop()?.toLowerCase();
-    
-    // Map extensions to content types
-    const contentTypes: Record<string, string> = {
-      "css": "text/css",
-      "js": "text/javascript",
-      "png": "image/png",
-      "jpg": "image/jpeg",
-      "jpeg": "image/jpeg",
-      "svg": "image/svg+xml"
-    };
-    
-    const contentType = fileExt && contentTypes[fileExt] 
-      ? contentTypes[fileExt] 
-      : "application/octet-stream";
-      
-    return serveStaticFile(filePath, contentType);
-  }
-
-  // Route: GET / (Homepage with form and recent pastes)
-  if (req.method === "GET" && url.pathname === "/") {
-    return new Response(renderHomePage(), {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
-
-  // Route: GET /list (List all pastes)
-  if (req.method === "GET" && url.pathname === "/list") {
-    return new Response(renderPasteListPage(), {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
-
-  // Route: POST /pastes (handle JSON or form submissions)
-  if (req.method === "POST" && url.pathname === "/pastes") {
-    let content = "";
-    let expirationHours: number | null = null;
-    
-    const contentType = req.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      const body = await req.json();
-      content = body.content;
-      expirationHours = body.expirationHours ? parseInt(body.expirationHours) : null;
-    } else if (contentType.includes("application/x-www-form-urlencoded")) {
-      const formData = await req.formData();
-      content = formData.get("content")?.toString() || "";
-      const expiration = formData.get("expiration")?.toString();
-      expirationHours = expiration ? parseInt(expiration) : null;
-    }
-
-    if (!content) {
-      return new Response("Content is required", { status: 400 });
-    }
-
-    const id = generateId();
-    const created = new Date();
-    const pasteData: { content: string; created: Date; expiresAt?: Date } = { content, created };
-    
-    // Add expiration if specified
-    if (expirationHours && !isNaN(expirationHours)) {
-      const expiresAt = new Date(created);
-      expiresAt.setHours(expiresAt.getHours() + expirationHours);
-      pasteData.expiresAt = expiresAt;
-    }
-    
-    pastes.set(id, pasteData);
-    
-    // Save pastes after adding a new one
-    await debouncedSavePastes();
-    
-    // Redirect to the new paste page
-    return new Response(null, {
-      status: 302,
-      headers: { "Location": `/pastes/${id}` },
-    });
-  }
-
-  // Route: GET /pastes/:id to retrieve a paste
-  if (req.method === "GET" && url.pathname.startsWith("/pastes/")) {
-    const id = url.pathname.split("/")[2];
-    if (!pastes.has(id)) {
-      return new Response("Paste not found", { status: 404 });
-    }
-    const { content, created } = pastes.get(id)!;
-    return new Response(renderPastePage(id, content, created), {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
-
-  // Fallback: Route not found
-  return new Response("Not Found", { status: 404 });
-});
+// Use Deno.serve API with the error handling middleware
+Deno.serve({ port: 8000 }, handleRequest);
