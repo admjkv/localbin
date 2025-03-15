@@ -4,7 +4,7 @@ import * as eta from "@eta-dev/eta";
 
 // File-based storage with in-memory cache
 const STORAGE_FILE = "./pastes.json";
-let pastes = new Map<string, { content: string; created: Date }>();
+let pastes = new Map<string, { content: string; created: Date; expiresAt?: Date }>();
 
 // Initialize Eta after your other constants
 const etaEngine = new eta.Eta({ views: "./templates" });
@@ -195,13 +195,18 @@ Deno.serve({ port: 8000 }, async (req: Request) => {
   // Route: POST /pastes (handle JSON or form submissions)
   if (req.method === "POST" && url.pathname === "/pastes") {
     let content = "";
+    let expirationHours: number | null = null;
+    
     const contentType = req.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const body = await req.json();
       content = body.content;
+      expirationHours = body.expirationHours ? parseInt(body.expirationHours) : null;
     } else if (contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
       content = formData.get("content")?.toString() || "";
+      const expiration = formData.get("expiration")?.toString();
+      expirationHours = expiration ? parseInt(expiration) : null;
     }
 
     if (!content) {
@@ -209,7 +214,17 @@ Deno.serve({ port: 8000 }, async (req: Request) => {
     }
 
     const id = generateId();
-    pastes.set(id, { content, created: new Date() });
+    const created = new Date();
+    const pasteData: { content: string; created: Date; expiresAt?: Date } = { content, created };
+    
+    // Add expiration if specified
+    if (expirationHours && !isNaN(expirationHours)) {
+      const expiresAt = new Date(created);
+      expiresAt.setHours(expiresAt.getHours() + expirationHours);
+      pasteData.expiresAt = expiresAt;
+    }
+    
+    pastes.set(id, pasteData);
     
     // Save pastes after adding a new one
     await debouncedSavePastes();
